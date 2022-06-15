@@ -38,6 +38,8 @@ var attachPlayEvent = function (e) {
                     targetEl.classList.contains('p-1') ? info.querySelector('span').innerHTML = 'Player 2 turn' :
                         info.querySelector('span').innerHTML = 'Player 1 turn';
                     targetEl.value = '';
+                    playerInputs.forEach(function (input) { return input.disabled = false; });
+                    targetEl.disabled = true;
                 }
             });
         }

@@ -1,4 +1,4 @@
-const playerInputs: NodeListOf<Element> = document.querySelectorAll('.player-input');
+const playerInputs: NodeListOf<HTMLInputElement> = document.querySelectorAll('.player-input');
 const error: HTMLElement = document.querySelector('.error');
 const info: HTMLElement = document.querySelector('.info');
 
@@ -8,7 +8,7 @@ const getAllTickTaks = (): Array<Element> => {
     return all_tick_tack_boxes;
 }
 
-const attachPlayEvent = (e: HTMLElement): void => {
+const attachPlayEvent = (e: HTMLInputElement): void => {
 
     e.addEventListener('keyup', function(e): void {
         const elemKeyEvent = e as KeyboardEvent;
@@ -47,6 +47,9 @@ const attachPlayEvent = (e: HTMLElement): void => {
                         info.querySelector('span').innerHTML = 'Player 1 turn';
                     
                     targetEl.value = '';
+
+                    playerInputs.forEach(input => input.disabled = false);
+                    targetEl.disabled = true;
                 }
             })       
         }
