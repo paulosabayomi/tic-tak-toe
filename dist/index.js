@@ -181,10 +181,9 @@ var attachPlayEvent = function (e) {
                     playerInputs.forEach(function (input) { return input.disabled = false; });
                     targetEl.disabled = true;
                     playerInputs.forEach(function (input) { return input.focus(); });
-                    var _a = checkWin(), win = _a[0], row = _a[1], player = _a[2];
+                    var _a = checkWin(), win = _a[0], row = _a[1], player_1 = _a[2];
                     console.log(checkWin());
                     if (win) {
-                        // info.querySelector('span').innerHTML = 'Player ' + player + ' wins';
                         playerInputs.forEach(function (input) { return input.disabled = true; });
                         replayButton.disabled = false;
                         if (row === 0) {
@@ -205,8 +204,10 @@ var attachPlayEvent = function (e) {
                         else if (row === 5) {
                             getAllTickTaks()[4].classList.add('win-5');
                         }
-                        winInfoPopup.style.display = 'flex';
-                        winInfoPopup.querySelector('.inner div:nth-child(2)').innerHTML = player == 'o' ? '1' : '2';
+                        setTimeout(function () {
+                            winInfoPopup.style.display = 'flex';
+                            winInfoPopup.querySelector('.inner div:nth-child(2)').innerHTML = player_1 == 'o' ? '1' : '2';
+                        }, 1000);
                     }
                 }
             });

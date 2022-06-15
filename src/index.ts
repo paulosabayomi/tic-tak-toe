@@ -7,7 +7,7 @@ const replayButton: HTMLButtonElement = document.querySelector('.replay');
 
 const getAllTickTaks = (): Array<Element> => {
     let all_tick_tack_boxes: Array<Element> = []
-    document.querySelectorAll('.tto-box').forEach(tickTak => all_tick_tack_boxes.push(tickTak));
+    document.querySelectorAll('.tto-box').forEach((tickTak: HTMLElement) => all_tick_tack_boxes.push(tickTak));
     return all_tick_tack_boxes;
 }
 
@@ -184,7 +184,6 @@ const attachPlayEvent = (e: HTMLInputElement): void => {
                     const [win, row, player] = checkWin();
                     console.log(checkWin())
                     if (win) {
-                        // info.querySelector('span').innerHTML = 'Player ' + player + ' wins';
                         playerInputs.forEach(input => input.disabled = true);
                         replayButton.disabled = false;
 
@@ -202,8 +201,10 @@ const attachPlayEvent = (e: HTMLInputElement): void => {
                             getAllTickTaks()[4].classList.add('win-5');
                         }
 
-                        winInfoPopup.style.display = 'flex';
-                        winInfoPopup.querySelector('.inner div:nth-child(2)').innerHTML = player == 'o' ? '1' : '2';
+                        setTimeout(() => {
+                            winInfoPopup.style.display = 'flex';
+                            winInfoPopup.querySelector('.inner div:nth-child(2)').innerHTML = player == 'o' ? '1' : '2';
+                        }, 1000);
                     }                      
 
                 }

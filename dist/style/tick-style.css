@@ -352,3 +352,7 @@ body h1 {
     font-size: 150%;
     color: white;
 }
+
+.footer {
+    text-align: center;
+}
