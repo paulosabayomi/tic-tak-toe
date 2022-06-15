@@ -40,6 +40,17 @@ replayButton.addEventListener('click', el => {
 
 startButton.addEventListener('click', e => startGame(e.currentTarget as HTMLButtonElement));
 
+const checkAllPlayed = (): boolean => {
+    let allPlayed: boolean = true;
+    getAllTickTaks().forEach(tickTak => {
+        if (allPlayed == false) return;
+        if (tickTak.querySelector('span').className === '') {
+            allPlayed = false;
+        }
+    })
+    return allPlayed;
+}
+
 const checkWin = (): [boolean, number, string] => {
     const all_tick_tack_boxes: Array<Element> = getAllTickTaks();
     let win: boolean = false;
@@ -199,13 +210,30 @@ const attachPlayEvent = (e: HTMLInputElement): void => {
                             getAllTickTaks()[6].classList.add('win-4');
                         }else if (row === 5) {
                             getAllTickTaks()[4].classList.add('win-5');
+                        }else if (row === 6) {
+                            getAllTickTaks()[4].classList.add('win-6');
                         }
 
                         setTimeout(() => {
                             winInfoPopup.style.display = 'flex';
-                            winInfoPopup.querySelector('.inner div:nth-child(2)').innerHTML = player == 'o' ? '1' : '2';
+                            winInfoPopup.querySelector('.inner').innerHTML = `
+                                <div class="">Player</div>
+                                <div class="">${player == 'o' ? '1' : '2'}</div>
+                                <div class="">Wins</div>
+                            `;
                         }, 1000);
-                    }                      
+                    }else if (!win && checkAllPlayed()) {
+                        playerInputs.forEach(input => input.disabled = true);
+                        replayButton.disabled = false;
+                        setTimeout(() => {
+                            winInfoPopup.style.display = 'flex';
+                            winInfoPopup.querySelector('.inner').innerHTML = `
+                                <div class="">Game Over</div>
+                                <div class="">No one wins</div>
+                            `;
+                        }, 500);
+
+                    }                     
 
                 }
             })       

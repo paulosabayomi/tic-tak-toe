@@ -233,7 +233,7 @@ body h1 {
     border-bottom: 380px solid rgb(255, 38, 0);
     z-index: +999;
     transform: rotateZ(-90deg);
-    animation: widen-bottom .3s linear;
+    animation: widen-bottom .2s linear;
 }
 
 .main-container .tto-cont .tto-inner-cont .win-1::after {
@@ -245,7 +245,7 @@ body h1 {
     border-top: 380px solid rgb(255, 38, 0);
     z-index: +999;
     transform: rotateZ(-90deg);
-    animation: widen-top .3s linear;
+    animation: widen-top .2s linear;
 }
 
 .main-container .tto-cont .tto-inner-cont .win-2::after {
@@ -257,7 +257,7 @@ body h1 {
     border-bottom: 380px solid rgb(255, 38, 0);
     z-index: +999;
     transform: rotateZ(-90deg);
-    animation: widen-bottom .3s linear;
+    animation: widen-bottom .2s linear;
 }
 
 .main-container .tto-cont .tto-inner-cont .win-3::after {
@@ -270,7 +270,7 @@ body h1 {
     border-top: 380px solid rgb(255, 38, 0);
     z-index: +999;
     /* transform: rotateZ(-90deg); */
-    animation: widen-top .3s linear;
+    animation: widen-top .2s linear;
 }
 
 .main-container .tto-cont .tto-inner-cont .win-4::after {
@@ -283,7 +283,7 @@ body h1 {
     border-top: 380px solid rgb(255, 38, 0);
     z-index: +999;
     /* transform: rotateZ(-90deg); */
-    animation: widen-top .3s linear;
+    animation: widen-top .2s linear;
 }
 
 .main-container .tto-cont .tto-inner-cont .win-5::after {
@@ -296,7 +296,20 @@ body h1 {
     border-top: 380px solid rgb(255, 38, 0);
     z-index: +999;
     transform: rotateZ(-45deg);
-    animation: widen-top .3s linear;
+    animation: widen-top .2s linear;
+}
+
+.main-container .tto-cont .tto-inner-cont .win-6::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -145px;
+    border-right: 5px solid transparent;
+    border-left: 5px solid transparent;
+    border-top: 380px solid rgb(255, 38, 0);
+    z-index: +999;
+    transform: rotateZ(45deg);
+    animation: widen-top .2s linear;
 }
 
 @keyframes widen-top {

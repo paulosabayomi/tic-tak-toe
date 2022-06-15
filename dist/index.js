@@ -34,6 +34,17 @@ replayButton.addEventListener('click', function (el) {
     document.querySelector('div[class*="win-"]').className = removeWinClass.join(' ');
 });
 startButton.addEventListener('click', function (e) { return startGame(e.currentTarget); });
+var checkAllPlayed = function () {
+    var allPlayed = true;
+    getAllTickTaks().forEach(function (tickTak) {
+        if (allPlayed == false)
+            return;
+        if (tickTak.querySelector('span').className === '') {
+            allPlayed = false;
+        }
+    });
+    return allPlayed;
+};
 var checkWin = function () {
     var all_tick_tack_boxes = getAllTickTaks();
     var win = false;
@@ -204,10 +215,21 @@ var attachPlayEvent = function (e) {
                         else if (row === 5) {
                             getAllTickTaks()[4].classList.add('win-5');
                         }
+                        else if (row === 6) {
+                            getAllTickTaks()[4].classList.add('win-6');
+                        }
                         setTimeout(function () {
                             winInfoPopup.style.display = 'flex';
-                            winInfoPopup.querySelector('.inner div:nth-child(2)').innerHTML = player_1 == 'o' ? '1' : '2';
+                            winInfoPopup.querySelector('.inner').innerHTML = "\n                                <div class=\"\">Player</div>\n                                <div class=\"\">".concat(player_1 == 'o' ? '1' : '2', "</div>\n                                <div class=\"\">Wins</div>\n                            ");
                         }, 1000);
+                    }
+                    else if (!win && checkAllPlayed()) {
+                        playerInputs.forEach(function (input) { return input.disabled = true; });
+                        replayButton.disabled = false;
+                        setTimeout(function () {
+                            winInfoPopup.style.display = 'flex';
+                            winInfoPopup.querySelector('.inner').innerHTML = "\n                                <div class=\"\">Game Over</div>\n                                <div class=\"\">No one wins</div>\n                            ";
+                        }, 500);
                     }
                 }
             });
