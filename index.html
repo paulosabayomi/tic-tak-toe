@@ -15,8 +15,10 @@
                 <span></span>
             </div>
             <div class="">
-                <input type="text" placeholder="Player 1 (o)" value="" class="player-input p-1">
-                <input type="text" placeholder="Player 2 (x)" class="player-input p-2">
+                <button class="start">Start</button>
+                <input type="text" placeholder="Player 1 (o)" disabled value="" class="player-input p-1">
+                <input type="text" placeholder="Player 2 (x)" disabled class="player-input p-2">
+                <button class="replay" disabled="true">Replay</button>
             </div>
             <div class="error">
                 <span></span>
@@ -24,6 +26,13 @@
         </div>
         <div class="tto-cont">
             <div class="tto-inner-cont">
+                <div class="winner-info-popup">
+                    <div class="inner">
+                        <div class="">Player</div>
+                        <div class=""></div>
+                        <div class="">Wins</div>
+                    </div>
+                </div>
                 <div class="tto-inner">
                     <div class="tto-box">
                         <span></span>
