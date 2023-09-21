@@ -6,33 +6,73 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     <link rel="stylesheet" href="./dist/style/tick-style.css">
+    <!-- Font Awesome -->
+    <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    rel="stylesheet"
+    />
+    <!-- Google Fonts -->
+    <link
+    href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
+    rel="stylesheet"
+    />
+    <!-- MDB -->
+    <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.4.1/mdb.min.css"
+    rel="stylesheet"
+    />
 </head>
-<body>
-    <h1>Tick Tak Toe</h1>
+<body>   
+    <div class="my-3">
+        <h1>Multiplayer Tic Tac Toe</h1>
+    </div>   
     <div class="main-container">
-        <div class="input-cont">
-            <div class="info">
-                <span></span>
+        <div class="form-group d-flex align-items-end flex-nowrap px-2">
+            <div class="" style="cursor: pointer; border-radius: 12px;" id="settings-btn">
+                <i class="fa-solid fa-gear"></i> Settings
+            </div>
+            <div class="mx-3">
+                <i class="fa-solid fa-face-grin-wide"></i>: <span id="game-view-type"><small><em>nc</em></small></span>
+            </div>
+            <div class="mx-3">
+                <i class="fa-solid fa-hashtag"></i>: <span id="room-id-display"><small><em>nc</em></small></span>
             </div>
             <div class="">
-                <button class="start">Start</button>
-                <input type="text" placeholder="Player 1 (o)" disabled value="" class="player-input p-1">
-                <input type="text" placeholder="Player 2 (x)" disabled class="player-input p-2">
-                <button class="replay" disabled="true">Replay</button>
-            </div>
-            <div class="error">
-                <span></span>
+                <i class="fa-solid fa-users"></i>: <span class="connected-users"><em>0</em></span>
             </div>
         </div>
+
+        <div class="top-cont">
+            <div class="message-cont text-white" style="font-size: 80%; height: 12px;">
+                <div class="info text-info">
+                    <span></span>
+                </div>
+                <div class="error text-danger">
+                    <span></span>
+                </div>
+            </div>
+
+            <div class="score-cont">
+                <div class="score-items shadow-4 mx-1">
+                    <div class="score-player">X</div>
+                    <div class="score-count" id="x">0</div>
+                </div>
+                <div class="score-items shadow-4 mx-1">
+                    <div class="score-player">O</div>
+                    <div class="score-count" id="o">0</div>
+                </div>
+            </div>
+            
+        </div>
+
         <div class="tto-cont">
             <div class="tto-inner-cont">
+                <div class="win-slash"></div>
+
                 <div class="winner-info-popup">
-                    <div class="inner">
-                        <!-- <div class="">Player</div>
-                        <div class=""></div>
-                        <div class="">Wins</div> -->
-                    </div>
+                    <div class="inner"></div>
                 </div>
+
                 <div class="tto-inner">
                     <div class="tto-box">
                         <span></span>
@@ -44,6 +84,7 @@
                         <span></span>
                     </div>
                 </div>
+
                 <div class="tto-inner">
                     <div class="tto-box">
                         <span></span>
@@ -55,6 +96,7 @@
                         <span></span>
                     </div>
                 </div>
+
                 <div class="tto-inner">
                     <div class="tto-box">
                         <span></span>
@@ -65,15 +107,100 @@
                     <div class="tto-box">
                         <span></span>
                     </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <span>&copy; Copyright 2022 - Tick Tak Toe made with TypeScript by Paulos Ab </span>
+    </div>
+
+  
+    <!-- Modal -->
+    <div class="modal fade" id="user-info-dialog" tabindex="-1" aria-labelledby="user-info-dialog-label" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header border-bottom-0">
+                    <h5 class="modal-title" id="user-info-dialog-label">
+                        <div class="">How should others identify you?</div> 
+                    </h5>
+                    <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div style="font-size: 80%;">
+                        <div class="modal-info text-center text-info">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="d-flex justify-content-between mb-2">
+                            <label for="username" style="font-size: 85%;">Username</label>
+                            <button class="btn btn-sm btn-primary" id="session-connect-btn"><small>Connect</small></button>
+                        </div>
+                        <small class="text-info">Enter your preferred username and click connect to start session</small>
+                        <input type="text" class="form-control" id="username" placeholder="your username">
+                    </div>
+
+                    <div class="form-group mt-2">
+                        <label for="room-id" style="font-size: 85%;">Connected Room ID - </label>
+                        <small class="text-info">Enter another room id to join a different room</small>
+                        <div class="d-flex">
+                            <input type="text" disabled class="form-control" placeholder="" id="room-id">
+                            <button class="btn btn-primary btn-sm mx-2 border-10" disabled id="join-session-btn">Join</button>
+                        </div>
+                    </div>
+
+                    <div class=" mt-2">
+                        <label for="player-type" style="font-size: 85%;">Player Type</label>
+                        <select name="" class="form-select mb-sm-3 mb-lg-0" id="player-type">
+                            <option value="" selected>Select Player Type</option>
+                            <option value="o">O</option>
+                            <option value="x">X</option>
+                        </select>
+                    </div>
+
+                    <hr>
+                    <h5 class="">
+                        <div class="">Session Details</div> 
+                    </h5>
+
+                    <div>
+                        Your room ID: <span id="current-users-room-id"><small><em>not connected</em></small></span>
+                    </div>
+
+                    <div>
+                        No of Connected Users: <span class="connected-users"><small><em>not connected</em></small></span>
+                    </div>
+
+                    <div class="shadow-3 rounded-3 mt-3 text-center hover-shadow" style="cursor: pointer;">
+                        <button class="btn btn-light btn-block" id="room-link-copy-btn">Click to copy room link</button>
+                    </div>
+                    
+                    <div class="h6 mt-3">Connected Users List</div>
+                    <div class="d-block mt-1" id="connected-users-list">
+                        <small><em>not connected</em></small>
+                    </div>
+
+                </div>
+                <div class="px-3 pt-1">
+                    <div class="w-100" style="font-size: 65% !important; line-height: 12px !important;">
+                        Note the info you provide here is not tracked, it is only used to identify you to other users in the same game room
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary">Save changes</button>
                 </div>
             </div>
         </div>
     </div>
-    <div class="footer">
-        <span>&copy; Copyright 2022 - Tick Tak Toe made TypeScript by Paulos Ab </span>
-    </div>
 
+    <!-- MDB -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.4.1/mdb.min.js"></script>
     <script src="./dist/index.js"></script>
+
     
 </body>
 </html>

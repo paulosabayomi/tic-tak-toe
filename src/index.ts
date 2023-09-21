@@ -1,44 +1,101 @@
-const playerInputs: NodeListOf<HTMLInputElement> = document.querySelectorAll('.player-input');
+let socket: null | WebSocket = null
 const error: HTMLElement = document.querySelector('.error');
 const info: HTMLElement = document.querySelector('.info');
+const modalInfo: HTMLElement = document.querySelector('.modal-info');
 const winInfoPopup: HTMLElement = document.querySelector('.winner-info-popup');
-const startButton: HTMLButtonElement = document.querySelector('.start');
-const replayButton: HTMLButtonElement = document.querySelector('.replay');
+const playerTypeSelect = document.querySelector('#player-type') as HTMLInputElement
+const roomIdInputEl = document.querySelector('#room-id') as HTMLInputElement
+const usernameInputEl = document.querySelector('#username') as HTMLInputElement
+const roomIdDisplayEl = document.querySelector('#room-id-display') as HTMLSpanElement
+const connectedUsersCount = document.querySelectorAll('.connected-users') as NodeListOf<HTMLSpanElement>
+const connectedUsersList = document.querySelector('#connected-users-list') as HTMLSpanElement
+const connectedUserRoomIdEl = document.querySelector('#current-users-room-id') as HTMLSpanElement
+const gameViewTypeEl = document.querySelector('#game-view-type') as HTMLSpanElement
+let currentUserSocketId = ''
+let gameViewPosition: 'spectator' | 'guest' | 'host' | '' = ''
+let lastPlayed: string = ''
+// @ts-ignore
+const userInfoModal = new mdb.Modal(document.getElementById('user-info-dialog'))
+const settingsBtn = document.querySelector('#settings-btn') as HTMLDivElement
+userInfoModal.show()
+const winWays = {
+    0: [
+        [0,1,2], 
+        [0,3,6], 
+        [0,4,8]
+    ],
+    1: [[1,4,7]],
+    2: [
+        [2,4,6], 
+        [2,5,8]
+    ],
+    3: [[3,4,5]],
+    6: [[6,7,8]]
+}
+const winSlash = document.querySelector('.win-slash') as HTMLDivElement
+const joinSessionBtn = document.querySelector('#join-session-btn') as HTMLButtonElement
+const roomLinkCopyBtn = document.querySelector('#room-link-copy-btn') as HTMLButtonElement
+const sessionConnectBtn = document.querySelector('#session-connect-btn') as HTMLButtonElement
+const connected_users: Array<{[key in string]: string}> = []
+const gameCount = {
+    o: 0,
+    x: 0
+}
 
-const getAllTickTaks = (): Array<Element> => {
-    let all_tick_tack_boxes: Array<Element> = []
-    document.querySelectorAll('.tto-box').forEach((tickTak: HTMLElement) => all_tick_tack_boxes.push(tickTak));
+roomIdInputEl.value = ""
+
+const getAllTickTaks = (): Array<HTMLDivElement> => {
+    let all_tick_tack_boxes: Array<HTMLDivElement> = []
+    document.querySelectorAll('.tto-box').forEach((tickTak: HTMLDivElement) => all_tick_tack_boxes.push(tickTak));
     return all_tick_tack_boxes;
 }
 
-const startGame = (el: HTMLButtonElement): void => {
-    playerInputs.forEach(input => {input.disabled = false});
-    el.innerText = 'Pause';
-    el.removeEventListener('click', () => startGame(el));
-    el.addEventListener('click', () => pauseGame(el));
+playerTypeSelect.onchange = (e) => {
+    updateCurrentPlayerBox((e.currentTarget as HTMLSelectElement).value)
+}
+
+const updateCurrentPlayerBox = (player: string) => {
+    document.querySelectorAll('.score-items').forEach(item => item.classList.remove('current-player'))
+    document.querySelector(`#${player}`).parentElement.classList.add('current-player')
 }
 
 const pauseGame = (el: HTMLButtonElement): void => {
-    playerInputs.forEach(input => {input.disabled = true});
     el.innerText = 'Resume';
-    el.addEventListener('click', () => startGame(el));
     el.removeEventListener('click', () => pauseGame(el));
 }
 
-replayButton.addEventListener('click', el => {
-    getAllTickTaks().forEach(tickTak => tickTak.querySelector('span').className = '');
-    playerInputs.forEach(input => {input.disabled = true; input.value = ''});
-    const curTarget = el.currentTarget as HTMLButtonElement;
-    curTarget.disabled = true;  
-    pauseGame(startButton);  
-    winInfoPopup.style.display = 'none';
-    info.querySelector('span').innerHTML = '';
-    const removeWinClass: string[] = document.querySelector('div[class*="win-"]').classList.toString().split(' ')
-    removeWinClass.splice(-1, 1);
-    document.querySelector('div[class*="win-"]').className = removeWinClass.join(' ');
-})
+const reset = () => {
+    winInfoPopup.querySelector('.inner').innerHTML = ''
+    winInfoPopup.style.display = 'none'
+    getAllTickTaks().forEach(tick => tick.querySelector('span').className = '')
+    winSlash.className = 'win-slash'
+    winSlash.style.display = 'none'
+    winSlash.style.transform = 'none'
+}
 
-startButton.addEventListener('click', e => startGame(e.currentTarget as HTMLButtonElement));
+winInfoPopup.onclick = () => {
+    if (gameViewPosition == 'spectator') return;
+    reset()
+    socket?.send(JSON.stringify({
+        ev: 'reset-game',
+        username: usernameInputEl.value,
+        roomId: roomIdInputEl.value
+    }))
+}
+
+const showInfo = (msg: string) => {
+    info.querySelector('span').innerHTML = msg;
+    setTimeout(() => {
+        info.querySelector('span').innerHTML = ""
+    }, 2000);
+}
+
+const showError = (msg: string) => {
+    error.querySelector('span').innerHTML = msg
+    setTimeout(() => {
+        error.querySelector('span').innerHTML = ""
+    }, 2000);
+}
 
 const checkAllPlayed = (): boolean => {
     let allPlayed: boolean = true;
@@ -51,195 +108,342 @@ const checkAllPlayed = (): boolean => {
     return allPlayed;
 }
 
-const checkWin = (): [boolean, number, string] => {
-    const all_tick_tack_boxes: Array<Element> = getAllTickTaks();
-    let win: boolean = false;
-    let result: [boolean, number, string] = [false, -1, ''];
-    for (let i = 0; i < 7; i++) {
-        const checkRow: string[] = [];
-        if (i === 0) {
-            checkRow.push(all_tick_tack_boxes[0].querySelector('span').className);
-            if (checkRow[0] === '') continue; 
-            all_tick_tack_boxes.forEach((tickTak: Element, index: number): void => {
-                if (index === 1 || (index === 2 && win != false)) {
-                    win = checkRow.includes(tickTak.querySelector('span').className) ? true : false
+const chekcWinV2 = () => {
+    let win = []
+    const allTicks = getAllTickTaks()
+    for (const index in winWays) {
+        if (Object.prototype.hasOwnProperty.call(winWays, index)) {
+            const winDimension: [] = winWays[index]; // like [[0,0,0]...]
+            if (allTicks[index].querySelector('span').classList.length === 0) continue
+            winDimension.forEach((dimension: Array<number>) => { 
+                if (win.length > 0) return
+                console.log('dimension: ', dimension);
+                const checksSet = new Set([
+                    allTicks[index].querySelector('span').className, 
+                    allTicks[dimension[1]].querySelector('span').className,
+                    allTicks[dimension[2]].querySelector('span').className,
+                ])
+
+                if (checksSet.size === 1) {
+                    win = [index, dimension, allTicks[index].querySelector('span').className]
                 }
-            });
-            if (win) {
-                result = [win, i, checkRow[0]];
-                break;
+                
+            })
+            if (win.length > 0) break
+        }
+    }
+    return win
+}
+
+const tick = (playedIndex: number, playerType: string): void => {
+    const tickBoxes = getAllTickTaks()
+
+    const playedIndexElm = tickBoxes[playedIndex]
+
+    if (playedIndexElm.querySelector('span').classList.length > 0) return
+    
+    playedIndexElm.querySelector('span').classList.add(playerType);   
+    
+    playerType != playerTypeSelect.value ? showInfo('Your turn') : showInfo('the turn of player ' + (playerType == 'o' ? 'x' : 'o'));
+    updateCurrentPlayerBox(playerType == 'o' ? 'x' : 'o')
+    lastPlayed = playerType
+
+    const winData = chekcWinV2()
+    if (winData.length > 0) {
+        const [winIndex, winDimArr, player] = winData
+        const firstElm = tickBoxes[winIndex]
+        const lastElm = tickBoxes[winDimArr[2]]
+
+        const firstElmHalfHeight = firstElm.clientHeight / 2
+        const lastElmHalfHeight = lastElm.clientHeight / 2
+
+        const firstElmOffsetTop = firstElm.parentElement.offsetTop
+        const lastElmOffsetTop = lastElm.parentElement.offsetTop
+
+        const firstElmOffsetLeft = firstElm.offsetLeft
+        const lastElmOffsetLeft = lastElm.offsetLeft
+
+        const firstElmCenter = firstElmOffsetLeft + firstElmHalfHeight
+        const lastElmCenter = lastElmOffsetLeft + lastElmHalfHeight
+
+        updateWinCount(player)
+
+        winSlash.style.display = 'flex'
+        if (lastElmOffsetLeft > firstElmOffsetLeft) {
+            if (lastElmOffsetTop > firstElmOffsetTop) {
+                winSlash.style.left = (firstElm.clientHeight + firstElmHalfHeight) + 'px'
+                winSlash.style.top = (firstElmHalfHeight / 4) + 'px'
+                winSlash.style.transform = `rotateZ(-45deg)`                                
+            }else{
+                winSlash.style.top = (firstElmOffsetTop + firstElmHalfHeight) + 'px'
+                winSlash.style.left = 5 + 'px'
+                winSlash.classList.add('horizontal')
             }
-        }else if (i === 1) {
-            checkRow.push(all_tick_tack_boxes[3].querySelector('span').className);
-            if (checkRow[0] === '') continue; 
-            all_tick_tack_boxes.forEach((tickTak: Element, index: number): void => {
-                if (index === 4 || (index === 5 &&  win != false)) {
-                    win = checkRow.includes(tickTak.querySelector('span').className) ? true : false
-                }
-            });
-            if (win) {
-                result = [win, i, checkRow[0]];
-                break;
-            }
-        }else if (i === 2) {
-            checkRow.push(all_tick_tack_boxes[6].querySelector('span').className);
-            if (checkRow[0] === '') continue; 
-            all_tick_tack_boxes.forEach((tickTak: Element, index: number): void => {
-                if (index === 7 || (index === 8 &&  win != false)) {
-                    win = checkRow.includes(tickTak.querySelector('span').className) ? true : false
-                }
-            });
-            if (win) {
-                result = [win, i, checkRow[0]];
-                break;
-            }
-        }else if (i === 3) {
-            checkRow.push(all_tick_tack_boxes[2].querySelector('span').className);
-            if (checkRow[0] === '') continue; 
-            all_tick_tack_boxes.forEach((tickTak: Element, index: number): void => {
-                if (index === 5 || (index === 8 &&  win != false)) {
-                    win = checkRow.includes(tickTak.querySelector('span').className) ? true : false
-                }
-            });
-            if (win) {
-                result = [win, i, checkRow[0]];
-                break;
-            }
-        }else if (i === 4) {
-            checkRow.push(all_tick_tack_boxes[6].querySelector('span').className);
-            if (checkRow[0] === '') continue; 
-            all_tick_tack_boxes.forEach((tickTak: Element, index: number): void => {
-                if (index === 0 || (index === 4 &&  win != false)) {
-                    win = checkRow.includes(tickTak.querySelector('span').className) ? true : false
-                }
-            });
-            if (win) {
-                result = [win, i, checkRow[0]];
-                break;
-            }
-        }else if (i === 5) {
-            checkRow.push(all_tick_tack_boxes[0].querySelector('span').className);
-            if (checkRow[0] === '') continue; 
-            all_tick_tack_boxes.forEach((tickTak: Element, index: number): void => {
-                if (index === 4 || (index === 8 &&  win != false)) {
-                    win = checkRow.includes(tickTak.querySelector('span').className) ? true : false
-                }
-            });
-            if (win) {
-                result = [win, i, checkRow[0]];
-                break;
-            }
-        }else if (i === 6) {
-            checkRow.push(all_tick_tack_boxes[2].querySelector('span').className);
-            if (checkRow[0] === '') continue; 
-            all_tick_tack_boxes.forEach((tickTak: Element, index: number): void => {
-                if (index === 4 || (index === 6 &&  win != false)) {
-                    win = checkRow.includes(tickTak.querySelector('span').className) ? true : false
-                }
-            });
-            if (win) {
-                result = [win, i, checkRow[0]];
-                break;
-            }
+            
+        }else if (firstElmOffsetLeft > lastElmOffsetLeft){
+            winSlash.style.left = (firstElm.clientHeight + firstElmHalfHeight) + 'px'
+            winSlash.style.transform = `rotateZ(45deg)`                                
+        }else{
+            winSlash.style.left = firstElmCenter + 'px'
+            winSlash.style.top = (5) + 'px'
         }
         
+        setTimeout(() => {
+            winInfoPopup.style.display = 'flex';
+            winInfoPopup.querySelector('.inner').innerHTML = `
+                <div class="">Player</div>
+                <div class="won-player-info">${player}</div>
+                <div class="">Wins</div>
+            `;
+        }, 1000);
+    }else if (winData.length == 0 && checkAllPlayed()) {
+        setTimeout(() => {
+            winInfoPopup.style.display = 'flex';
+            winInfoPopup.querySelector('.inner').innerHTML = `
+                <div class="">DRAW</div>
+            `;
+        }, 500);
+
+    } 
+                        
+
+}
+
+document.querySelectorAll('.tto-box').forEach((box: HTMLDivElement, index: number) => {
+    box.onclick = (e) => {
+        e.stopPropagation()
+        if (gameViewPosition == "" || connected_users.length < 2) {
+            return showError('Please join a room or invite a friend to play with')
+        }else if (gameViewPosition == "spectator") {
+            return showError('You are a spectator, request to be a guest to play')
+        }
+        if (lastPlayed == playerTypeSelect.value) return showError('it is not your turn yet')
+        if (playerTypeSelect.value == '') {
+            userInfoModal.show();
+            return modalInfo.innerHTML = 'You must select a player type';            
+        }
+        console.log('box clicked', index, playerTypeSelect);
+        tick(index, playerTypeSelect.value)
+        sendMove(index, playerTypeSelect.value)                 
+    }
+})
+
+const updateWinCount = (player: string) => {
+    gameCount[player] += 1;
+    document.querySelector(`.score-count#${player}`).innerHTML = gameCount[player];
+}
+
+
+roomIdInputEl.onchange = (e) => {
+    const socketId = roomIdInputEl.value
+    if (socketId != '' && socketId != currentUserSocketId && socketId.length == 6) {
+        joinSessionBtn.disabled = false
+    }else{
+        joinSessionBtn.disabled = true
+    }
+}
+
+settingsBtn.onclick = () => userInfoModal.show()
+
+sessionConnectBtn.onclick = (e) => {
+    e.stopPropagation()
+    if (usernameInputEl.value == "") return;
+    if (playerTypeSelect.value == "") return modalInfo.innerHTML = "Please select a Player type below";
+    (e.currentTarget as HTMLButtonElement).disabled = true;
+    (e.currentTarget as HTMLButtonElement).innerHTML = "Connecting..."
+    socket = new WebSocket("ws://localhost:9800/tttg");
+
+    // socket closed
+    socket?.addEventListener("close", (ev) => handleSocketClose(ev));
+
+    // error handler
+    socket?.addEventListener("error", (ev) => handleSocketError(ev));
+
+    // socket opened
+    socket?.addEventListener("open", (ev) => handleSocketOpen(ev));
+
+    // message is received
+    socket?.addEventListener("message", (ev) => handleSocketMessage(ev));
+}
+
+const handleSocketMessage = (event: any) => {
+    console.log('socket got message', event);
+    if (!event.data) return
+    const data = JSON.parse(event.data)
+    console.log('data', data);
+
+    switch (data.ev) {
+        case 'sess':
+            const roomId = data.sessionId;
+            currentUserSocketId = roomId
+            roomIdInputEl.disabled = false;
+            roomIdInputEl.value = roomId;
+            roomIdDisplayEl.innerHTML = roomId
+            connectedUserRoomIdEl.innerHTML = roomId;
+            roomIdInputEl.placeholder = roomId;
+            addConnectedUser(roomId, usernameInputEl.value);
+            checkNdConnectToOtherRoom();
+            gameViewTypeEl.innerHTML = "Host";
+            gameViewPosition = "host";
+            break;
+
+        case 'user-joined':
+            const userData = JSON.parse(data.data)
+            addConnectedUser(userData.roomId, userData.username, connected_users.length >= 2 ? "spectator" : "guest")
+            showInfo(userData.username + " joined room")
+            if (!isUserInConnectedUsersList(roomId)) {
+                sendHandShake(userData.roomId, userData.connectingTo)
+            }
+            break;
+
+        case 'handshake':
+            const handshakingUserData = JSON.parse(data.data);
+            gameViewPosition = handshakingUserData.noOfConnectedPeople > 2 ? 'spectator' : 'guest'
+            gameViewTypeEl.innerHTML = gameViewPosition;
+            for (const key in handshakingUserData.gameCount) { // update score counts
+                if (Object.prototype.hasOwnProperty.call(gameCount, key)) {
+                    const count = handshakingUserData.gameCount[key];
+                    document.querySelector(`.score-count#${key}`).innerHTML = count;
+                }
+            }
+            if (handshakingUserData.noOfConnectedPeople <= 2) {
+                playerTypeSelect.value = handshakingUserData.playerType == 'o' ? 'x' : 'o'
+                playerTypeSelect.disabled = true
+                updateCurrentPlayerBox(playerTypeSelect.value)
+                showInfo('You are now playing as Player ' + playerTypeSelect.value)
+            }
+            addConnectedUser(handshakingUserData.roomId, handshakingUserData.username, handshakingUserData.position, handshakingUserData.noOfConnectedPeople)
+            break;
+
+        case 'player-move':
+            tick(data.moveIndex, data.playerType)
+            break;
+        
+        case 'reset-game':
+            reset();
+            showInfo(data.username + ' has reset the game board');
+            
+    
+        default:
+            break;
     }
 
-    return result;
+    
+
 }
 
-const attachPlayEvent = (e: HTMLInputElement): void => {
+const handleSocketOpen = (event: any) => {
+    sessionConnectBtn.disabled = false
+    sessionConnectBtn.innerHTML = 'Connect'
+    userInfoModal.hide()
+    console.log('socket open', event);
+}
 
-    e.addEventListener('keyup', function(e): void {
-        const elemKeyEvent = e as KeyboardEvent;
-        const targetEl = elemKeyEvent.currentTarget as HTMLInputElement;
-    
-        const regexp = /[\D]/ig
-        if (regexp.test(targetEl.value)) {
-            targetEl.value = targetEl.value.replace(regexp, '');
-            error.querySelector('span').innerHTML = 'Only numbers are allowed';
-            return
-        }
-    
-        if (parseInt(targetEl.value) > 9 || parseInt(targetEl.value) < 1) {
-            error.querySelector('span').innerHTML = 'Number must be between 1 and 9';
-            return        
-        }
-    
-        if (elemKeyEvent.ctrlKey && elemKeyEvent.key.toLowerCase() === 'enter') {
-            error.querySelector('span').innerHTML = '';
-            info.querySelector('span').innerHTML = ''
-    
-            getAllTickTaks().forEach((tickTak: Element, index: number) => {
-                if (parseInt(targetEl.value) === index + 1) {
-                    if (tickTak.querySelector('span').classList.contains('o') || tickTak.querySelector('span').classList.contains('x')) {
-                        error.querySelector('span').innerHTML = 'Number ' + targetEl.value + ' already played';
-                        return               
-                    }
-    
-                    if (targetEl.classList.contains('p-1')) {
-                        tickTak.querySelector('span').classList.add('o');
-                    }else if (targetEl.classList.contains('p-2')) {
-                        tickTak.querySelector('span').classList.add('x');                    
-                    }
-    
-                    targetEl.classList.contains('p-1') ? info.querySelector('span').innerHTML = 'Player 2 turn' : 
-                        info.querySelector('span').innerHTML = 'Player 1 turn';
-                    
-                    targetEl.value = '';
+const handleSocketClose = (event: any) => {
+    console.log('socket closed', event);
+}
 
-                    playerInputs.forEach(input => input.disabled = false);
-                    targetEl.disabled = true;
-                    playerInputs.forEach(input => input.focus());
+const handleSocketError = (event: any) => {
+    sessionConnectBtn.disabled = false
+    sessionConnectBtn.innerHTML = 'Connect'
+}
 
-                    const [win, row, player] = checkWin();
-                    console.log(checkWin())
-                    if (win) {
-                        playerInputs.forEach(input => input.disabled = true);
-                        replayButton.disabled = false;
+const checkNdConnectToOtherRoom = () => {
+    const urlQuery = window.location.search
+    if (urlQuery == "") return
+    const roomNameSplit = urlQuery.split("=")
+    if (roomNameSplit.length == 0) return console.log('no url', urlQuery);
+    const roomName = roomNameSplit[1]
+    console.log('urlQuery', roomName);
+    handleJoinRoom(roomName)
+}
 
-                        if (row === 0) {
-                            document.querySelectorAll('.tto-inner')[0].classList.add('win-0');
-                        }else if (row === 1) {
-                            document.querySelectorAll('.tto-inner')[1].classList.add('win-1');
-                        }else if (row === 2) {
-                            document.querySelectorAll('.tto-inner')[2].classList.add('win-2');
-                        }else if (row === 3) {
-                            getAllTickTaks()[2].classList.add('win-3');
-                        }else if (row === 4) {
-                            getAllTickTaks()[6].classList.add('win-4');
-                        }else if (row === 5) {
-                            getAllTickTaks()[4].classList.add('win-5');
-                        }else if (row === 6) {
-                            getAllTickTaks()[4].classList.add('win-6');
-                        }
+const handleJoinRoom = (roomName: string) => {
+    socket?.send(JSON.stringify({ev: 'join-room', 
+        newRoomId: roomName, 
+        username: usernameInputEl.value,
+        mySessionId: currentUserSocketId
+    }));
+    roomIdInputEl.value = roomName
+    roomIdDisplayEl.innerHTML = roomName
+}
 
-                        setTimeout(() => {
-                            winInfoPopup.style.display = 'flex';
-                            winInfoPopup.querySelector('.inner').innerHTML = `
-                                <div class="">Player</div>
-                                <div class="">${player == 'o' ? '1' : '2'}</div>
-                                <div class="">Wins</div>
-                            `;
-                        }, 1000);
-                    }else if (!win && checkAllPlayed()) {
-                        playerInputs.forEach(input => input.disabled = true);
-                        replayButton.disabled = false;
-                        setTimeout(() => {
-                            winInfoPopup.style.display = 'flex';
-                            winInfoPopup.querySelector('.inner').innerHTML = `
-                                <div class="">Game Over</div>
-                                <div class="">No one wins</div>
-                            `;
-                        }, 500);
+const addConnectedUser = (roomId: string, username: string, position?: string, noOfConnectedPeople?: number) => {
+    if (isUserInConnectedUsersList(roomId)) return;
+    const uObj = {}
+    uObj[roomId] = username;
+    if (position != undefined) {
+        uObj['position'] = position;
+    }
+    connected_users.push(uObj)
+    updateConnectedUsersList(noOfConnectedPeople)
+}
 
-                    }                     
-
-                }
-            })       
-        }
+const isUserInConnectedUsersList = (roomId: string) => {
+    let isInList = false
+    connected_users.forEach(user => {
+        if (isInList == true) return;
+        if (Object.keys(user).includes(roomId)) isInList = true;
     })
-
+    return isInList
 }
 
-playerInputs.forEach(attachPlayEvent);
+const updateConnectedUsersList = (noOfConnectedPeople?: number) => {
+    connectedUsersCount.forEach(el => el.innerHTML = connected_users.length.toString())
+    connectedUsersList.innerHTML = ""
+    connected_users.map(user => {
+        const spanEl = document.createElement('div')
+        if (Object.keys(user)[0] == currentUserSocketId) {
+            console.log('noOfConnectedPeople noOfConnectedPeople', noOfConnectedPeople);
+            
+            spanEl.innerHTML = "You - " + (roomIdInputEl.value == currentUserSocketId ? "host" : gameViewPosition)
+        }else{
+            spanEl.innerHTML = Object.values(user)[0] + ' - ' + Object.values(user)[1]
+        }
+        connectedUsersList.append(spanEl)
+    })
+}
+
+const sendHandShake = (userSocketId: string, roomUserConnectedTo: string) => {
+    socket?.send(JSON.stringify({ev: 'handshake', 
+        to: userSocketId, 
+        username: usernameInputEl.value, 
+        sessionId: currentUserSocketId,
+        position: roomUserConnectedTo == currentUserSocketId ? "host" : gameViewPosition,
+        playerType: playerTypeSelect.value,
+        noOfConnectedPeople: connected_users.length,
+        gameCount
+    }))
+}
+
+const sendMove = (moveIndex: number, playerType: string) => {
+    socket?.send(JSON.stringify({
+        ev: 'player-move',
+        roomId: roomIdInputEl.value,
+        moveIndex, playerType
+    }));
+}
+
+joinSessionBtn.onclick = async (e) => {
+    e.preventDefault();
+    const newRoomId = roomIdInputEl.value;
+    handleJoinRoom(newRoomId);
+}
+
+roomLinkCopyBtn.onclick = (e) => {
+    e.stopPropagation()
+    const thisBtn = e.currentTarget as HTMLButtonElement
+    if (currentUserSocketId == '') {
+        thisBtn.innerHTML = "Not Connected"
+        setTimeout(() => {
+            thisBtn.innerHTML = "Click to copy room link"
+        }, 1000);
+        return
+    }
+    const urlLink = window.location.href + '?room=' + roomIdInputEl.value
+    navigator.clipboard.writeText(urlLink)
+    thisBtn.innerHTML = "Copied to Clipboard"
+    setTimeout(() => {
+        thisBtn.innerHTML = "Click to copy room link"
+    }, 1000);
+}
