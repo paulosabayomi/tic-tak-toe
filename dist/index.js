@@ -34,6 +34,15 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+};
 var _this = this;
 var socket = null;
 var error = document.querySelector('.error');
@@ -43,18 +52,21 @@ var winInfoPopup = document.querySelector('.winner-info-popup');
 var playerTypeSelect = document.querySelector('#player-type');
 var roomIdInputEl = document.querySelector('#room-id');
 var usernameInputEl = document.querySelector('#username');
+var chatTextInputEl = document.querySelector('#chat-input');
 var roomIdDisplayEl = document.querySelector('#room-id-display');
 var connectedUsersCount = document.querySelectorAll('.connected-users');
 var connectedUsersList = document.querySelector('#connected-users-list');
 var connectedUserRoomIdEl = document.querySelector('#current-users-room-id');
 var gameViewTypeEl = document.querySelector('#game-view-type');
+var closeRightPanel = document.querySelector('#close-right-panel');
+var closeLeftPanel = document.querySelector('#close-left-panel');
 var currentUserSocketId = '';
 var gameViewPosition = '';
 var lastPlayed = '';
 // @ts-ignore
 var userInfoModal = new mdb.Modal(document.getElementById('user-info-dialog'));
-var settingsBtn = document.querySelector('#settings-btn');
 userInfoModal.show();
+var settingsBtn = document.querySelector('#settings-btn');
 var winWays = {
     0: [
         [0, 1, 2],
@@ -73,12 +85,45 @@ var winSlash = document.querySelector('.win-slash');
 var joinSessionBtn = document.querySelector('#join-session-btn');
 var roomLinkCopyBtn = document.querySelector('#room-link-copy-btn');
 var sessionConnectBtn = document.querySelector('#session-connect-btn');
+var chatTextSendBtn = document.querySelector('#send-chat-input');
 var connected_users = [];
 var gameCount = {
     o: 0,
     x: 0
 };
 roomIdInputEl.value = "";
+closeLeftPanel.onclick = function (e) {
+    var thisEl = e.currentTarget;
+    var leftPanel = document.querySelector('#left-panel');
+    if (leftPanel.classList.contains('opened')) {
+        leftPanel.classList.remove('opened');
+        leftPanel.classList.add('closed');
+        thisEl.querySelector('i').classList.remove('fa-angle-left');
+        thisEl.querySelector('i').classList.add('fa-angle-right');
+    }
+    else {
+        leftPanel.classList.remove('closed');
+        leftPanel.classList.add('opened');
+        thisEl.querySelector('i').classList.remove('fa-angle-right');
+        thisEl.querySelector('i').classList.add('fa-angle-left');
+    }
+};
+closeRightPanel.onclick = function (e) {
+    var thisEl = e.currentTarget;
+    var rightPanel = document.querySelector('#chat-box-wrapper');
+    if (rightPanel.classList.contains('opened')) {
+        rightPanel.classList.remove('opened');
+        rightPanel.classList.add('closed');
+        thisEl.querySelector('i').classList.remove('fa-angle-right');
+        thisEl.querySelector('i').classList.add('fa-angle-left');
+    }
+    else {
+        rightPanel.classList.remove('closed');
+        rightPanel.classList.add('opened');
+        thisEl.querySelector('i').classList.remove('fa-angle-left');
+        thisEl.querySelector('i').classList.add('fa-angle-right');
+    }
+};
 var getAllTickTaks = function () {
     var all_tick_tack_boxes = [];
     document.querySelectorAll('.tto-box').forEach(function (tickTak) { return all_tick_tack_boxes.push(tickTak); });
@@ -291,10 +336,10 @@ var handleSocketMessage = function (event) {
             roomIdDisplayEl.innerHTML = roomId;
             connectedUserRoomIdEl.innerHTML = roomId;
             roomIdInputEl.placeholder = roomId;
+            gameViewPosition = "host";
             addConnectedUser(roomId, usernameInputEl.value);
             checkNdConnectToOtherRoom();
             gameViewTypeEl.innerHTML = "Host";
-            gameViewPosition = "host";
             break;
         case 'user-joined':
             var userData = JSON.parse(data.data);
@@ -320,6 +365,7 @@ var handleSocketMessage = function (event) {
                 updateCurrentPlayerBox(playerTypeSelect.value);
                 showInfo('You are now playing as Player ' + playerTypeSelect.value);
             }
+            handshakingUserData.moves.forEach(function (move) { return tick(move[0], move[1]); });
             addConnectedUser(handshakingUserData.roomId, handshakingUserData.username, handshakingUserData.position, handshakingUserData.noOfConnectedPeople);
             break;
         case 'player-move':
@@ -328,6 +374,32 @@ var handleSocketMessage = function (event) {
         case 'reset-game':
             reset();
             showInfo(data.username + ' has reset the game board');
+            break;
+        case 'chat-msg':
+            console.log('got chat message', data);
+            addMessageToUI(data.username, data.msg);
+            break;
+        case 'make-guest':
+            console.log('got to make-guest', data);
+            if (data.drop.room_id == currentUserSocketId) {
+                gameViewPosition = 'spectator';
+                updateUserPosition(currentUserSocketId, 'spectator');
+                showInfo(data.by.username + ' made you a Spectator and you can no longer participate in the game');
+            }
+            else if (data.for.room_id == currentUserSocketId) {
+                var playAs = data.by.playingAs == 'o' ? 'x' : 'o';
+                gameViewPosition = 'guest';
+                updateUserPosition(data.for.room_id, 'guest');
+                playerTypeSelect.value = playAs;
+                playerTypeSelect.disabled = true;
+                showInfo(data.by.username + ' made you a guest and you can now participate in the game, and you are now playing as ' + playAs);
+            }
+            else {
+                showInfo("".concat(data.by.username, " made ").concat(data.for.username, " a guest to replace ").concat(data.drop.username));
+            }
+            updateUserPosition(data.drop.room_id, 'spectator');
+            updateUserPosition(data.for.room_id, 'guest');
+            break;
         default:
             break;
     }
@@ -338,8 +410,39 @@ var handleSocketOpen = function (event) {
     userInfoModal.hide();
     console.log('socket open', event);
 };
+var addMessageToUI = function (senderName, message) {
+    var chatBoxWrapperCont = document.querySelector('#chat-box-wrapper');
+    var messageBoxCont = document.querySelector('.message-box-cont');
+    var messageBox = document.createElement('div');
+    messageBox.className = 'message-box d-block px-2 mt-1 w-100';
+    messageBox.innerHTML = "\n        <div class=\"sender-name\">".concat(senderName, "</div>\n        <small class=\"sender-msg\">").concat(message, "</small>\n    ");
+    messageBoxCont.append(messageBox);
+    chatBoxWrapperCont.scrollTop = chatBoxWrapperCont.scrollHeight;
+};
+var updateUserPosition = function (socketId, position) {
+    var clonedConnectedUsers = __spreadArray([], connected_users, true);
+    var removedUserDataIndex = clonedConnectedUsers.findIndex(function (user) { return user.room_id == socketId; });
+    var filteredData = clonedConnectedUsers.filter(function (user) { return user.room_id != socketId; });
+    var userToUpdate = clonedConnectedUsers[removedUserDataIndex];
+    console.log('userToUpdate', userToUpdate, 'position', position, 'socketId', socketId);
+    userToUpdate.position = position;
+    filteredData.splice(removedUserDataIndex, 0, userToUpdate);
+    connected_users = filteredData;
+    updateConnectedUsersList();
+};
 var handleSocketClose = function (event) {
     console.log('socket closed', event);
+    socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({ ev: 'user-left', username: usernameInputEl }));
+};
+var getMoves = function () {
+    var tickBoxes = getAllTickTaks();
+    var playedIndex = [];
+    tickBoxes.forEach(function (tick, index) {
+        if (tick.querySelector('span').classList.length > 0) {
+            playedIndex.push([index, tick.querySelector('span').className]);
+        }
+    });
+    return playedIndex;
 };
 var handleSocketError = function (event) {
     sessionConnectBtn.disabled = false;
@@ -369,7 +472,8 @@ var addConnectedUser = function (roomId, username, position, noOfConnectedPeople
     if (isUserInConnectedUsersList(roomId))
         return;
     var uObj = {};
-    uObj[roomId] = username;
+    uObj.room_id = roomId;
+    uObj.username = username;
     if (position != undefined) {
         uObj['position'] = position;
     }
@@ -381,7 +485,7 @@ var isUserInConnectedUsersList = function (roomId) {
     connected_users.forEach(function (user) {
         if (isInList == true)
             return;
-        if (Object.keys(user).includes(roomId))
+        if (user.room_id == roomId)
             isInList = true;
     });
     return isInList;
@@ -389,16 +493,42 @@ var isUserInConnectedUsersList = function (roomId) {
 var updateConnectedUsersList = function (noOfConnectedPeople) {
     connectedUsersCount.forEach(function (el) { return el.innerHTML = connected_users.length.toString(); });
     connectedUsersList.innerHTML = "";
+    console.log('connected_users', connected_users);
     connected_users.map(function (user) {
+        var userListContainer = document.createElement('div');
+        userListContainer.className = "d-flex justify-content-between";
         var spanEl = document.createElement('div');
-        if (Object.keys(user)[0] == currentUserSocketId) {
+        if (user.room_id == currentUserSocketId) {
             console.log('noOfConnectedPeople noOfConnectedPeople', noOfConnectedPeople);
-            spanEl.innerHTML = "You - " + (roomIdInputEl.value == currentUserSocketId ? "host" : gameViewPosition);
+            // spanEl.innerHTML = "You - " + (roomIdInputEl.value == currentUserSocketId ? "host" : gameViewPosition)
+            spanEl.innerHTML = "You - " + gameViewPosition;
         }
         else {
-            spanEl.innerHTML = Object.values(user)[0] + ' - ' + Object.values(user)[1];
+            spanEl.innerHTML = user.username + ' - ' + user.position;
         }
-        connectedUsersList.append(spanEl);
+        userListContainer.append(spanEl);
+        if (((roomIdInputEl.value == currentUserSocketId || gameViewPosition.toLowerCase() == "guest")
+            && user.room_id != currentUserSocketId)
+            && (user.position != 'host' && user.position != 'guest')) {
+            var makeUserGuestBtn = document.createElement('div');
+            makeUserGuestBtn.className = "rounded bg-info px-2 py-1 mb-2";
+            makeUserGuestBtn.innerHTML = "<small style=\"font-size: 70% !important;\">Make guest</small>";
+            makeUserGuestBtn.onclick = function (e) {
+                var whoToSetAsSpectator = connected_users.filter(function (user) { return (user.room_id != currentUserSocketId && (user.position == 'guest' || user.position == 'host')); });
+                console.log('whoToSetAsSpectator', whoToSetAsSpectator);
+                socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({
+                    ev: "make-guest",
+                    roomId: roomIdInputEl.value,
+                    for: { room_id: user.room_id, username: user.username },
+                    drop: { room_id: whoToSetAsSpectator[0].room_id, username: whoToSetAsSpectator[0].username },
+                    by: { username: usernameInputEl.value, socket_id: currentUserSocketId, playingAs: playerTypeSelect.value }
+                }));
+                updateUserPosition(user.room_id, 'guest');
+                updateUserPosition(whoToSetAsSpectator[0].room_id, 'spectator');
+            };
+            userListContainer.append(makeUserGuestBtn);
+        }
+        connectedUsersList.append(userListContainer);
     });
 };
 var sendHandShake = function (userSocketId, roomUserConnectedTo) {
@@ -408,8 +538,7 @@ var sendHandShake = function (userSocketId, roomUserConnectedTo) {
         sessionId: currentUserSocketId,
         position: roomUserConnectedTo == currentUserSocketId ? "host" : gameViewPosition,
         playerType: playerTypeSelect.value,
-        noOfConnectedPeople: connected_users.length, gameCount: gameCount
-    }));
+        noOfConnectedPeople: connected_users.length, gameCount: gameCount, moves: getMoves() }));
 };
 var sendMove = function (moveIndex, playerType) {
     socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({
@@ -428,6 +557,24 @@ joinSessionBtn.onclick = function (e) { return __awaiter(_this, void 0, void 0, 
         return [2 /*return*/];
     });
 }); };
+chatTextInputEl.onkeydown = function (e) {
+    console.log(e);
+    if (e.key.toLowerCase() == "enter") {
+        console.log('enter');
+        sendMessage();
+    }
+};
+chatTextSendBtn.onclick = function (e) {
+    e.preventDefault();
+    sendMessage();
+};
+var sendMessage = function () {
+    if (chatTextInputEl.value == "" || socket == null)
+        return;
+    socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({ ev: 'chat-msg', username: usernameInputEl.value, roomId: roomIdInputEl.value, msg: chatTextInputEl.value }));
+    addMessageToUI("You", chatTextInputEl.value);
+    chatTextInputEl.value = "";
+};
 roomLinkCopyBtn.onclick = function (e) {
     e.stopPropagation();
     var thisBtn = e.currentTarget;

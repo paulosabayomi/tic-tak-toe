@@ -37,17 +37,21 @@ input::placeholder {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    /* overflow-y: visible !important; */
     align-items: center;
 }
 
 .main-container .tto-cont {
     width: 100%;
-    height: 60vh;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    height: 68vh;
     display: flex;
     flex-direction: row;
     justify-content: center;
     align-items: center;
     padding: 15px;
+    position: relative;
 }
 
 .main-container .tto-cont .tto-inner-cont {
@@ -422,4 +426,68 @@ input::placeholder {
 
 .top-cont .score-cont .score-items.current-player {
     border: 3px solid rgb(0, 187, 255);
+}
+
+.tto-cont .side-box {
+    width: 25%;
+    height: 400px;
+    overflow-y: auto;
+    transition: all .5s ease-in;
+    z-index: +99;
+}
+
+
+
+.tto-cont .side-box .message-box-cont .message-box, .side-box {
+    background: rgba( 255, 255, 255, 0.25 );
+    box-shadow: 0 8px 32px 0 rgba( 31, 38, 135, 0.37 );
+    backdrop-filter: blur( 4px );
+    -webkit-backdrop-filter: blur( 4px );
+    border-radius: 10px;
+    border: 1px solid rgba( 255, 255, 255, 0.18 );
+}
+
+.side-bar-close-btn {
+    position: absolute;
+    top: 50%;
+    width: 40px;
+    background-color: rgb(43, 122, 226);
+    cursor: pointer;
+}
+
+.side-bar-close-btn.left {
+    right: -58px;
+}
+
+.side-bar-close-btn.right {
+    left: -58px;
+}
+
+#left-panel {
+    left: 0px; 
+}
+
+#left-panel.closed {
+    left: -25%;
+}
+
+#chat-box-wrapper {
+    right: 0px;
+}
+
+#chat-box-wrapper.closed {
+    right: -25%;
+}
+
+@media only screen and (max-width: 600px) {
+    .tto-cont .side-box {
+        width: 45%;
+    }
+    #chat-box-wrapper.closed {
+        right: -45%;
+    }
+
+    #left-panel.closed {
+        left: -45%;
+    }
 }

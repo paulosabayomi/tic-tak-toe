@@ -65,7 +65,20 @@
             
         </div>
 
-        <div class="tto-cont">
+        <div class="tto-cont justify-content-center px-0">
+            <div class="connected-users-list-cont p-3 side-box closed position-absolute" id="left-panel"
+                style="border-radius: 0px 10px 10px 0px; overflow-y: visible;">
+                <div class="position-relative" style="overflow-y: visible;">
+                    <div class="side-bar-close-btn left d-flex justify-content-center py-2" id="close-left-panel">
+                        <i class="fa fa-angle-right"></i>
+                    </div>
+                    <div class="h6">Connected Users List</div>
+                    <div class="d-block mt-1" id="connected-users-list">
+                        <small><em>not connected</em></small>
+                    </div>
+                </div>
+            </div>
+
             <div class="tto-inner-cont">
                 <div class="win-slash"></div>
 
@@ -110,11 +123,31 @@
                 </div>
 
             </div>
+
+            <div class="connected-users-list-cont p-3 side-box closed position-absolute align-items-end d-flex flex-wrap" 
+                id="chat-box-wrapper" style="overflow-y: visible !important;">
+                <div class="position-relative" style="overflow-y: visible !important;">
+                    <div class="side-bar-close-btn right d-flex justify-content-center py-2" id="close-right-panel">
+                        <i class="fa fa-angle-right"></i>
+                    </div>
+                    <div class="message-box-cont d-flex align-items-end flex-wrap mt-2" style="overflow-y: visible !important; height: auto !important;">
+                        <!-- <div class="message-box d-block px-2 mt-1">
+                            <div class="sender-name">Kali</div>
+                            <small class="sender-msg">Hi everyone I hope you are all good, Hi everyone I hope you are all good Hi everyone I hope you are all goo</small>
+                        </div> -->
+                    </div>
+                    
+                    <div class="form-group d-flex my-2 flex-wrap" style="position: sticky; bottom: 0px;">
+                        <input type="text" class="form-control mb-xs-2 mb-lg-0" id="chat-input" placeholder="start typing...">
+                        <button class="btn btn-primary btn-sm mx-2" id="send-chat-input">Send</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="footer">
-        <span>&copy; Copyright 2022 - Tick Tak Toe made with TypeScript by Paulos Ab </span>
+        <span>&copy; Copyright 2023 - Tic Tak Toe made with TypeScript by Paulos Ab </span>
     </div>
 
   
@@ -177,11 +210,6 @@
                     <div class="shadow-3 rounded-3 mt-3 text-center hover-shadow" style="cursor: pointer;">
                         <button class="btn btn-light btn-block" id="room-link-copy-btn">Click to copy room link</button>
                     </div>
-                    
-                    <div class="h6 mt-3">Connected Users List</div>
-                    <div class="d-block mt-1" id="connected-users-list">
-                        <small><em>not connected</em></small>
-                    </div>
 
                 </div>
                 <div class="px-3 pt-1">
@@ -191,7 +219,6 @@
                 </div>
                 <div class="modal-footer border-top-0 pt-0">
                     <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary">Save changes</button>
                 </div>
             </div>
         </div>

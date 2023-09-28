@@ -6,18 +6,22 @@ const winInfoPopup: HTMLElement = document.querySelector('.winner-info-popup');
 const playerTypeSelect = document.querySelector('#player-type') as HTMLInputElement
 const roomIdInputEl = document.querySelector('#room-id') as HTMLInputElement
 const usernameInputEl = document.querySelector('#username') as HTMLInputElement
+const chatTextInputEl = document.querySelector('#chat-input') as HTMLInputElement
 const roomIdDisplayEl = document.querySelector('#room-id-display') as HTMLSpanElement
 const connectedUsersCount = document.querySelectorAll('.connected-users') as NodeListOf<HTMLSpanElement>
 const connectedUsersList = document.querySelector('#connected-users-list') as HTMLSpanElement
 const connectedUserRoomIdEl = document.querySelector('#current-users-room-id') as HTMLSpanElement
 const gameViewTypeEl = document.querySelector('#game-view-type') as HTMLSpanElement
+const closeRightPanel = document.querySelector('#close-right-panel') as HTMLDivElement
+const closeLeftPanel = document.querySelector('#close-left-panel') as HTMLDivElement
 let currentUserSocketId = ''
-let gameViewPosition: 'spectator' | 'guest' | 'host' | '' = ''
+type TGameViewPosition = 'spectator' | 'guest' | 'host'
+let gameViewPosition: TGameViewPosition | '' = ''
 let lastPlayed: string = ''
 // @ts-ignore
 const userInfoModal = new mdb.Modal(document.getElementById('user-info-dialog'))
-const settingsBtn = document.querySelector('#settings-btn') as HTMLDivElement
 userInfoModal.show()
+const settingsBtn = document.querySelector('#settings-btn') as HTMLDivElement
 const winWays = {
     0: [
         [0,1,2], 
@@ -36,13 +40,47 @@ const winSlash = document.querySelector('.win-slash') as HTMLDivElement
 const joinSessionBtn = document.querySelector('#join-session-btn') as HTMLButtonElement
 const roomLinkCopyBtn = document.querySelector('#room-link-copy-btn') as HTMLButtonElement
 const sessionConnectBtn = document.querySelector('#session-connect-btn') as HTMLButtonElement
-const connected_users: Array<{[key in string]: string}> = []
+const chatTextSendBtn = document.querySelector('#send-chat-input') as HTMLButtonElement
+type TConnectedUsers = {username: string; room_id: string; position?: TGameViewPosition;}
+let connected_users: Array<TConnectedUsers> = []
 const gameCount = {
     o: 0,
     x: 0
 }
 
 roomIdInputEl.value = ""
+
+closeLeftPanel.onclick = (e) => {
+    const thisEl = e.currentTarget as HTMLDivElement
+    const leftPanel = document.querySelector('#left-panel')
+    if (leftPanel.classList.contains('opened')) {
+        leftPanel.classList.remove('opened')
+        leftPanel.classList.add('closed')
+        thisEl.querySelector('i').classList.remove('fa-angle-left')
+        thisEl.querySelector('i').classList.add('fa-angle-right')
+    }else{
+        leftPanel.classList.remove('closed')
+        leftPanel.classList.add('opened')
+        thisEl.querySelector('i').classList.remove('fa-angle-right')
+        thisEl.querySelector('i').classList.add('fa-angle-left')
+    }
+}
+
+closeRightPanel.onclick = (e) => {
+    const thisEl = e.currentTarget as HTMLDivElement
+    const rightPanel = document.querySelector('#chat-box-wrapper')
+    if (rightPanel.classList.contains('opened')) {
+        rightPanel.classList.remove('opened')
+        rightPanel.classList.add('closed')
+        thisEl.querySelector('i').classList.remove('fa-angle-right')
+        thisEl.querySelector('i').classList.add('fa-angle-left')
+    }else{
+        rightPanel.classList.remove('closed')
+        rightPanel.classList.add('opened')
+        thisEl.querySelector('i').classList.remove('fa-angle-left')
+        thisEl.querySelector('i').classList.add('fa-angle-right')
+    }
+}
 
 const getAllTickTaks = (): Array<HTMLDivElement> => {
     let all_tick_tack_boxes: Array<HTMLDivElement> = []
@@ -281,10 +319,10 @@ const handleSocketMessage = (event: any) => {
             roomIdDisplayEl.innerHTML = roomId
             connectedUserRoomIdEl.innerHTML = roomId;
             roomIdInputEl.placeholder = roomId;
+            gameViewPosition = "host";
             addConnectedUser(roomId, usernameInputEl.value);
             checkNdConnectToOtherRoom();
             gameViewTypeEl.innerHTML = "Host";
-            gameViewPosition = "host";
             break;
 
         case 'user-joined':
@@ -312,6 +350,7 @@ const handleSocketMessage = (event: any) => {
                 updateCurrentPlayerBox(playerTypeSelect.value)
                 showInfo('You are now playing as Player ' + playerTypeSelect.value)
             }
+            handshakingUserData.moves.forEach(move => tick(move[0], move[1]))
             addConnectedUser(handshakingUserData.roomId, handshakingUserData.username, handshakingUserData.position, handshakingUserData.noOfConnectedPeople)
             break;
 
@@ -322,7 +361,33 @@ const handleSocketMessage = (event: any) => {
         case 'reset-game':
             reset();
             showInfo(data.username + ' has reset the game board');
-            
+            break;
+
+        case 'chat-msg':
+            console.log('got chat message', data);
+            addMessageToUI(data.username, data.msg)
+            break;
+
+        case 'make-guest':
+            console.log('got to make-guest', data);
+            if (data.drop.room_id == currentUserSocketId) {
+                gameViewPosition = 'spectator'
+                updateUserPosition(currentUserSocketId, 'spectator')
+                showInfo(data.by.username + ' made you a Spectator and you can no longer participate in the game')
+            }else if (data.for.room_id == currentUserSocketId) {
+                const playAs = data.by.playingAs == 'o' ? 'x' : 'o'
+                gameViewPosition = 'guest'
+                updateUserPosition(data.for.room_id, 'guest')
+                playerTypeSelect.value = playAs
+                playerTypeSelect.disabled = true
+                showInfo(data.by.username + ' made you a guest and you can now participate in the game, and you are now playing as ' + playAs)
+            }else{
+                showInfo(`${data.by.username} made ${data.for.username} a guest to replace ${data.drop.username}`)
+            }
+
+            updateUserPosition(data.drop.room_id, 'spectator')
+            updateUserPosition(data.for.room_id, 'guest')
+            break;
     
         default:
             break;
@@ -339,8 +404,46 @@ const handleSocketOpen = (event: any) => {
     console.log('socket open', event);
 }
 
+const addMessageToUI = (senderName: string, message: string) => {
+    const chatBoxWrapperCont = document.querySelector('#chat-box-wrapper')
+    const messageBoxCont = document.querySelector('.message-box-cont')
+    const messageBox = document.createElement('div')
+    messageBox.className = 'message-box d-block px-2 mt-1 w-100'
+    messageBox.innerHTML = `
+        <div class="sender-name">${senderName}</div>
+        <small class="sender-msg">${message}</small>
+    `
+    messageBoxCont.append(messageBox)
+    chatBoxWrapperCont.scrollTop = chatBoxWrapperCont.scrollHeight
+}
+
+const updateUserPosition = (socketId: string, position: string) => {
+    const clonedConnectedUsers = [...connected_users]
+    const removedUserDataIndex = clonedConnectedUsers.findIndex(user => user.room_id == socketId)
+    const filteredData = clonedConnectedUsers.filter(user => user.room_id != socketId)
+    const userToUpdate = clonedConnectedUsers[removedUserDataIndex]
+    console.log('userToUpdate', userToUpdate, 'position', position, 'socketId', socketId);
+    
+    userToUpdate.position = position as TGameViewPosition
+    filteredData.splice(removedUserDataIndex, 0, userToUpdate)
+    connected_users = filteredData
+    updateConnectedUsersList()
+}
+
 const handleSocketClose = (event: any) => {
     console.log('socket closed', event);
+    socket?.send(JSON.stringify({ev: 'user-left', username: usernameInputEl}))
+}
+
+const getMoves = (): Array<any> => {
+    const tickBoxes = getAllTickTaks()
+    const playedIndex: Array<any> = []
+    tickBoxes.forEach((tick, index) => {
+        if (tick.querySelector('span').classList.length > 0) {
+            playedIndex.push([index, tick.querySelector('span').className])
+        }
+    })
+    return playedIndex;
 }
 
 const handleSocketError = (event: any) => {
@@ -370,10 +473,11 @@ const handleJoinRoom = (roomName: string) => {
 
 const addConnectedUser = (roomId: string, username: string, position?: string, noOfConnectedPeople?: number) => {
     if (isUserInConnectedUsersList(roomId)) return;
-    const uObj = {}
-    uObj[roomId] = username;
+    const uObj = {} as TConnectedUsers
+    uObj.room_id = roomId;
+    uObj.username = username;
     if (position != undefined) {
-        uObj['position'] = position;
+        uObj['position'] = position as TGameViewPosition;
     }
     connected_users.push(uObj)
     updateConnectedUsersList(noOfConnectedPeople)
@@ -383,7 +487,7 @@ const isUserInConnectedUsersList = (roomId: string) => {
     let isInList = false
     connected_users.forEach(user => {
         if (isInList == true) return;
-        if (Object.keys(user).includes(roomId)) isInList = true;
+        if (user.room_id == roomId) isInList = true;
     })
     return isInList
 }
@@ -391,16 +495,45 @@ const isUserInConnectedUsersList = (roomId: string) => {
 const updateConnectedUsersList = (noOfConnectedPeople?: number) => {
     connectedUsersCount.forEach(el => el.innerHTML = connected_users.length.toString())
     connectedUsersList.innerHTML = ""
+    console.log('connected_users', connected_users);
+    
     connected_users.map(user => {
+        const userListContainer = document.createElement('div')
+        userListContainer.className = "d-flex justify-content-between"
         const spanEl = document.createElement('div')
-        if (Object.keys(user)[0] == currentUserSocketId) {
+        if (user.room_id == currentUserSocketId) {
             console.log('noOfConnectedPeople noOfConnectedPeople', noOfConnectedPeople);
-            
-            spanEl.innerHTML = "You - " + (roomIdInputEl.value == currentUserSocketId ? "host" : gameViewPosition)
+            // spanEl.innerHTML = "You - " + (roomIdInputEl.value == currentUserSocketId ? "host" : gameViewPosition)
+            spanEl.innerHTML = "You - " + gameViewPosition
         }else{
-            spanEl.innerHTML = Object.values(user)[0] + ' - ' + Object.values(user)[1]
+            spanEl.innerHTML = user.username + ' - ' + user.position
         }
-        connectedUsersList.append(spanEl)
+        userListContainer.append(spanEl)
+        if (((roomIdInputEl.value == currentUserSocketId || gameViewPosition.toLowerCase() == "guest") 
+            && user.room_id != currentUserSocketId) 
+            && (user.position != 'host' && user.position != 'guest')) {
+            const makeUserGuestBtn = document.createElement('div')
+            makeUserGuestBtn.className = "rounded bg-info px-2 py-1 mb-2"
+            makeUserGuestBtn.innerHTML = `<small style="font-size: 70% !important;">Make guest</small>`
+            makeUserGuestBtn.onclick = (e) => {
+                let whoToSetAsSpectator = connected_users.filter(user => (user.room_id != currentUserSocketId && (user.position == 'guest' || user.position == 'host')))
+                console.log('whoToSetAsSpectator', whoToSetAsSpectator);
+                
+                socket?.send(JSON.stringify({
+                    ev: "make-guest", 
+                    roomId: roomIdInputEl.value,
+                    for: {room_id: user.room_id, username: user.username}, 
+                    drop: {room_id: whoToSetAsSpectator[0].room_id, username: whoToSetAsSpectator[0].username},
+                    by: {username: usernameInputEl.value, socket_id: currentUserSocketId, playingAs: playerTypeSelect.value}
+                }))
+
+                updateUserPosition(user.room_id, 'guest')
+                updateUserPosition(whoToSetAsSpectator[0].room_id, 'spectator')
+            }
+            userListContainer.append(makeUserGuestBtn)     
+
+        }
+        connectedUsersList.append(userListContainer)
     })
 }
 
@@ -412,7 +545,8 @@ const sendHandShake = (userSocketId: string, roomUserConnectedTo: string) => {
         position: roomUserConnectedTo == currentUserSocketId ? "host" : gameViewPosition,
         playerType: playerTypeSelect.value,
         noOfConnectedPeople: connected_users.length,
-        gameCount
+        gameCount,
+        moves: getMoves()
     }))
 }
 
@@ -428,6 +562,27 @@ joinSessionBtn.onclick = async (e) => {
     e.preventDefault();
     const newRoomId = roomIdInputEl.value;
     handleJoinRoom(newRoomId);
+}
+
+chatTextInputEl.onkeydown = (e) => {
+    console.log(e);
+    
+    if (e.key.toLowerCase() == "enter") {
+        console.log('enter');
+        sendMessage()
+    }
+}
+
+chatTextSendBtn.onclick = (e) => {
+    e.preventDefault()
+    sendMessage()
+}
+
+const sendMessage = () => {
+    if (chatTextInputEl.value == "" || socket == null) return;
+    socket?.send(JSON.stringify({ev: 'chat-msg', username: usernameInputEl.value, roomId: roomIdInputEl.value, msg: chatTextInputEl.value}))
+    addMessageToUI("You", chatTextInputEl.value)
+    chatTextInputEl.value = ""
 }
 
 roomLinkCopyBtn.onclick = (e) => {
