@@ -226,8 +226,11 @@
 
     <!-- MDB -->
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.4.1/mdb.min.js"></script>
-    <script src="./dist/index.js"></script>
+    <script type="module">
+        import { io } from "https://cdn.socket.io/4.3.2/socket.io.esm.min.js";
+        window.io = io
+    </script>
+    <script type="module" src="./dist/index.js"></script>
 
-    
 </body>
 </html>

@@ -152,11 +152,11 @@ winInfoPopup.onclick = function () {
     if (gameViewPosition == 'spectator')
         return;
     reset();
-    socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({
+    socket === null || socket === void 0 ? void 0 : socket.emit('reset-game', {
         ev: 'reset-game',
         username: usernameInputEl.value,
         roomId: roomIdInputEl.value
-    }));
+    });
 };
 var showInfo = function (msg) {
     info.querySelector('span').innerHTML = msg;
@@ -192,7 +192,6 @@ var chekcWinV2 = function () {
             winDimension.forEach(function (dimension) {
                 if (win.length > 0)
                     return;
-                console.log('dimension: ', dimension);
                 var checksSet = new Set([
                     allTicks[index].querySelector('span').className,
                     allTicks[dimension[1]].querySelector('span').className,
@@ -284,7 +283,6 @@ document.querySelectorAll('.tto-box').forEach(function (box, index) {
             userInfoModal.show();
             return modalInfo.innerHTML = 'You must select a player type';
         }
-        console.log('box clicked', index, playerTypeSelect);
         tick(index, playerTypeSelect.value);
         sendMove(index, playerTypeSelect.value);
     };
@@ -295,7 +293,7 @@ var updateWinCount = function (player) {
 };
 roomIdInputEl.onchange = function (e) {
     var socketId = roomIdInputEl.value;
-    if (socketId != '' && socketId != currentUserSocketId && socketId.length == 6) {
+    if (socketId != '' && socketId != currentUserSocketId) {
         joinSessionBtn.disabled = false;
     }
     else {
@@ -311,104 +309,84 @@ sessionConnectBtn.onclick = function (e) {
         return modalInfo.innerHTML = "Please select a Player type below";
     e.currentTarget.disabled = true;
     e.currentTarget.innerHTML = "Connecting...";
-    socket = new WebSocket("ws://localhost:9800/tttg");
-    // socket closed
-    socket === null || socket === void 0 ? void 0 : socket.addEventListener("close", function (ev) { return handleSocketClose(ev); });
-    // error handler
-    socket === null || socket === void 0 ? void 0 : socket.addEventListener("error", function (ev) { return handleSocketError(ev); });
-    // socket opened
-    socket === null || socket === void 0 ? void 0 : socket.addEventListener("open", function (ev) { return handleSocketOpen(ev); });
-    // message is received
-    socket === null || socket === void 0 ? void 0 : socket.addEventListener("message", function (ev) { return handleSocketMessage(ev); });
-};
-var handleSocketMessage = function (event) {
-    console.log('socket got message', event);
-    if (!event.data)
-        return;
-    var data = JSON.parse(event.data);
-    console.log('data', data);
-    switch (data.ev) {
-        case 'sess':
-            var roomId = data.sessionId;
-            currentUserSocketId = roomId;
-            roomIdInputEl.disabled = false;
-            roomIdInputEl.value = roomId;
-            roomIdDisplayEl.innerHTML = roomId;
-            connectedUserRoomIdEl.innerHTML = roomId;
-            roomIdInputEl.placeholder = roomId;
-            gameViewPosition = "host";
-            addConnectedUser(roomId, usernameInputEl.value);
-            checkNdConnectToOtherRoom();
-            gameViewTypeEl.innerHTML = "Host";
-            break;
-        case 'user-joined':
-            var userData = JSON.parse(data.data);
-            addConnectedUser(userData.roomId, userData.username, connected_users.length >= 2 ? "spectator" : "guest");
-            showInfo(userData.username + " joined room");
-            if (!isUserInConnectedUsersList(roomId)) {
-                sendHandShake(userData.roomId, userData.connectingTo);
+    // @ts-ignore
+    socket = window.io('wss://66.29.145.150:9800');
+    socket.on("connect_error", function (e) {
+        console.log('connect_error', e);
+    });
+    socket.on("connect", function () {
+        console.log('connected');
+        var roomId = socket.id;
+        currentUserSocketId = roomId;
+        roomIdInputEl.disabled = false;
+        roomIdInputEl.value = roomId;
+        roomIdDisplayEl.innerHTML = roomId;
+        connectedUserRoomIdEl.innerHTML = roomId;
+        roomIdInputEl.placeholder = roomId;
+        gameViewPosition = "host";
+        addConnectedUser(roomId, usernameInputEl.value);
+        checkNdConnectToOtherRoom();
+        gameViewTypeEl.innerHTML = "Host";
+        handleSocketOpen();
+    });
+    socket.on("user-joined", function (data) {
+        addConnectedUser(data.mySessionId, data.username, connected_users.length >= 2 ? "spectator" : "guest");
+        sendHandShake(data.mySessionId, data.newRoomId);
+        showInfo(data.username + " joined room");
+    });
+    socket.on("handshake", function (data) {
+        gameViewPosition = data.noOfConnectedPeople > 2 ? 'spectator' : 'guest';
+        gameViewTypeEl.innerHTML = gameViewPosition;
+        for (var key in data.gameCount) { // update score counts
+            if (Object.prototype.hasOwnProperty.call(gameCount, key)) {
+                var count = data.gameCount[key];
+                document.querySelector(".score-count#".concat(key)).innerHTML = count;
             }
-            break;
-        case 'handshake':
-            var handshakingUserData = JSON.parse(data.data);
-            gameViewPosition = handshakingUserData.noOfConnectedPeople > 2 ? 'spectator' : 'guest';
-            gameViewTypeEl.innerHTML = gameViewPosition;
-            for (var key in handshakingUserData.gameCount) { // update score counts
-                if (Object.prototype.hasOwnProperty.call(gameCount, key)) {
-                    var count = handshakingUserData.gameCount[key];
-                    document.querySelector(".score-count#".concat(key)).innerHTML = count;
-                }
-            }
-            if (handshakingUserData.noOfConnectedPeople <= 2) {
-                playerTypeSelect.value = handshakingUserData.playerType == 'o' ? 'x' : 'o';
-                playerTypeSelect.disabled = true;
-                updateCurrentPlayerBox(playerTypeSelect.value);
-                showInfo('You are now playing as Player ' + playerTypeSelect.value);
-            }
-            handshakingUserData.moves.forEach(function (move) { return tick(move[0], move[1]); });
-            addConnectedUser(handshakingUserData.roomId, handshakingUserData.username, handshakingUserData.position, handshakingUserData.noOfConnectedPeople);
-            break;
-        case 'player-move':
-            tick(data.moveIndex, data.playerType);
-            break;
-        case 'reset-game':
-            reset();
-            showInfo(data.username + ' has reset the game board');
-            break;
-        case 'chat-msg':
-            console.log('got chat message', data);
-            addMessageToUI(data.username, data.msg);
-            break;
-        case 'make-guest':
-            console.log('got to make-guest', data);
-            if (data.drop.room_id == currentUserSocketId) {
-                gameViewPosition = 'spectator';
-                updateUserPosition(currentUserSocketId, 'spectator');
-                showInfo(data.by.username + ' made you a Spectator and you can no longer participate in the game');
-            }
-            else if (data.for.room_id == currentUserSocketId) {
-                var playAs = data.by.playingAs == 'o' ? 'x' : 'o';
-                gameViewPosition = 'guest';
-                updateUserPosition(data.for.room_id, 'guest');
-                playerTypeSelect.value = playAs;
-                playerTypeSelect.disabled = true;
-                showInfo(data.by.username + ' made you a guest and you can now participate in the game, and you are now playing as ' + playAs);
-            }
-            else {
-                showInfo("".concat(data.by.username, " made ").concat(data.for.username, " a guest to replace ").concat(data.drop.username));
-            }
-            updateUserPosition(data.drop.room_id, 'spectator');
+        }
+        if (data.noOfConnectedPeople <= 2) {
+            playerTypeSelect.value = data.playerType == 'o' ? 'x' : 'o';
+            playerTypeSelect.disabled = true;
+            updateCurrentPlayerBox(playerTypeSelect.value);
+            showInfo('You are now playing as Player ' + playerTypeSelect.value);
+        }
+        data.moves.forEach(function (move) { return tick(move[0], move[1]); });
+        addConnectedUser(data.sessionId, data.username, data.position, data.noOfConnectedPeople);
+    });
+    socket.on("make-guest", function (data) {
+        if (data.drop.room_id == currentUserSocketId) {
+            gameViewPosition = 'spectator';
+            updateUserPosition(currentUserSocketId, 'spectator');
+            showInfo(data.by.username + ' made you a Spectator and you can no longer participate in the game');
+        }
+        else if (data.for.room_id == currentUserSocketId) {
+            var playAs = data.by.playingAs == 'o' ? 'x' : 'o';
+            gameViewPosition = 'guest';
             updateUserPosition(data.for.room_id, 'guest');
-            break;
-        default:
-            break;
-    }
+            playerTypeSelect.value = playAs;
+            playerTypeSelect.disabled = true;
+            showInfo(data.by.username + ' made you a guest and you can now participate in the game, and you are now playing as ' + playAs);
+        }
+        else {
+            showInfo("".concat(data.by.username, " made ").concat(data.for.username, " a guest to replace ").concat(data.drop.username));
+        }
+        updateUserPosition(data.drop.room_id, 'spectator');
+        updateUserPosition(data.for.room_id, 'guest');
+    });
+    socket.on("chat-msg", function (data) {
+        addMessageToUI(data.username, data.msg);
+    });
+    socket.on("reset-game", function (data) {
+        reset();
+        showInfo(data.username + ' has reset the game board');
+    });
+    socket.on("player-move", function (data) {
+        tick(data.moveIndex, data.playerType);
+    });
 };
 var handleSocketOpen = function (event) {
     sessionConnectBtn.disabled = false;
     sessionConnectBtn.innerHTML = 'Connect';
     userInfoModal.hide();
-    console.log('socket open', event);
 };
 var addMessageToUI = function (senderName, message) {
     var chatBoxWrapperCont = document.querySelector('#chat-box-wrapper');
@@ -424,15 +402,13 @@ var updateUserPosition = function (socketId, position) {
     var removedUserDataIndex = clonedConnectedUsers.findIndex(function (user) { return user.room_id == socketId; });
     var filteredData = clonedConnectedUsers.filter(function (user) { return user.room_id != socketId; });
     var userToUpdate = clonedConnectedUsers[removedUserDataIndex];
-    console.log('userToUpdate', userToUpdate, 'position', position, 'socketId', socketId);
     userToUpdate.position = position;
     filteredData.splice(removedUserDataIndex, 0, userToUpdate);
     connected_users = filteredData;
     updateConnectedUsersList();
 };
+/** @todo handle disconnect when user has disconnected */
 var handleSocketClose = function (event) {
-    console.log('socket closed', event);
-    socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({ ev: 'user-left', username: usernameInputEl }));
 };
 var getMoves = function () {
     var tickBoxes = getAllTickTaks();
@@ -454,17 +430,16 @@ var checkNdConnectToOtherRoom = function () {
         return;
     var roomNameSplit = urlQuery.split("=");
     if (roomNameSplit.length == 0)
-        return console.log('no url', urlQuery);
+        return;
     var roomName = roomNameSplit[1];
-    console.log('urlQuery', roomName);
     handleJoinRoom(roomName);
 };
 var handleJoinRoom = function (roomName) {
-    socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({ ev: 'join-room',
+    socket.emit('join-room', { ev: 'join-room',
         newRoomId: roomName,
         username: usernameInputEl.value,
         mySessionId: currentUserSocketId
-    }));
+    });
     roomIdInputEl.value = roomName;
     roomIdDisplayEl.innerHTML = roomName;
 };
@@ -493,14 +468,11 @@ var isUserInConnectedUsersList = function (roomId) {
 var updateConnectedUsersList = function (noOfConnectedPeople) {
     connectedUsersCount.forEach(function (el) { return el.innerHTML = connected_users.length.toString(); });
     connectedUsersList.innerHTML = "";
-    console.log('connected_users', connected_users);
     connected_users.map(function (user) {
         var userListContainer = document.createElement('div');
         userListContainer.className = "d-flex justify-content-between";
         var spanEl = document.createElement('div');
         if (user.room_id == currentUserSocketId) {
-            console.log('noOfConnectedPeople noOfConnectedPeople', noOfConnectedPeople);
-            // spanEl.innerHTML = "You - " + (roomIdInputEl.value == currentUserSocketId ? "host" : gameViewPosition)
             spanEl.innerHTML = "You - " + gameViewPosition;
         }
         else {
@@ -515,14 +487,13 @@ var updateConnectedUsersList = function (noOfConnectedPeople) {
             makeUserGuestBtn.innerHTML = "<small style=\"font-size: 70% !important;\">Make guest</small>";
             makeUserGuestBtn.onclick = function (e) {
                 var whoToSetAsSpectator = connected_users.filter(function (user) { return (user.room_id != currentUserSocketId && (user.position == 'guest' || user.position == 'host')); });
-                console.log('whoToSetAsSpectator', whoToSetAsSpectator);
-                socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({
+                socket === null || socket === void 0 ? void 0 : socket.emit('make-guest', {
                     ev: "make-guest",
                     roomId: roomIdInputEl.value,
                     for: { room_id: user.room_id, username: user.username },
                     drop: { room_id: whoToSetAsSpectator[0].room_id, username: whoToSetAsSpectator[0].username },
                     by: { username: usernameInputEl.value, socket_id: currentUserSocketId, playingAs: playerTypeSelect.value }
-                }));
+                });
                 updateUserPosition(user.room_id, 'guest');
                 updateUserPosition(whoToSetAsSpectator[0].room_id, 'spectator');
             };
@@ -532,21 +503,21 @@ var updateConnectedUsersList = function (noOfConnectedPeople) {
     });
 };
 var sendHandShake = function (userSocketId, roomUserConnectedTo) {
-    socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({ ev: 'handshake',
-        to: userSocketId,
+    socket.emit('handshake', { ev: 'handshake',
+        sendTo: userSocketId,
         username: usernameInputEl.value,
         sessionId: currentUserSocketId,
         position: roomUserConnectedTo == currentUserSocketId ? "host" : gameViewPosition,
         playerType: playerTypeSelect.value,
-        noOfConnectedPeople: connected_users.length, gameCount: gameCount, moves: getMoves() }));
+        noOfConnectedPeople: connected_users.length, gameCount: gameCount, moves: getMoves() });
 };
 var sendMove = function (moveIndex, playerType) {
-    socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({
+    socket === null || socket === void 0 ? void 0 : socket.emit('player-move', {
         ev: 'player-move',
         roomId: roomIdInputEl.value,
         moveIndex: moveIndex,
         playerType: playerType
-    }));
+    });
 };
 joinSessionBtn.onclick = function (e) { return __awaiter(_this, void 0, void 0, function () {
     var newRoomId;
@@ -554,13 +525,14 @@ joinSessionBtn.onclick = function (e) { return __awaiter(_this, void 0, void 0, 
         e.preventDefault();
         newRoomId = roomIdInputEl.value;
         handleJoinRoom(newRoomId);
+        window.history.pushState({}, '', window.location.origin);
+        window.history.pushState({}, '', '?room=' + newRoomId);
+        userInfoModal.hide();
         return [2 /*return*/];
     });
 }); };
 chatTextInputEl.onkeydown = function (e) {
-    console.log(e);
     if (e.key.toLowerCase() == "enter") {
-        console.log('enter');
         sendMessage();
     }
 };
@@ -571,7 +543,12 @@ chatTextSendBtn.onclick = function (e) {
 var sendMessage = function () {
     if (chatTextInputEl.value == "" || socket == null)
         return;
-    socket === null || socket === void 0 ? void 0 : socket.send(JSON.stringify({ ev: 'chat-msg', username: usernameInputEl.value, roomId: roomIdInputEl.value, msg: chatTextInputEl.value }));
+    socket === null || socket === void 0 ? void 0 : socket.emit('chat-msg', {
+        ev: 'chat-msg',
+        username: usernameInputEl.value,
+        roomId: roomIdInputEl.value,
+        msg: chatTextInputEl.value
+    });
     addMessageToUI("You", chatTextInputEl.value);
     chatTextInputEl.value = "";
 };
