@@ -288,7 +288,7 @@ sessionConnectBtn.onclick = (e) => {
     (e.currentTarget as HTMLButtonElement).disabled = true;
     (e.currentTarget as HTMLButtonElement).innerHTML = "Connecting..."
     // @ts-ignore
-    socket = window.io('ws://pryxy.com:9800', {
+    socket = window.io('http://pryxy.com:9800', {
         transports: ['websocket']
      });
 
