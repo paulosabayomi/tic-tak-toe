@@ -310,7 +310,7 @@ sessionConnectBtn.onclick = function (e) {
     e.currentTarget.disabled = true;
     e.currentTarget.innerHTML = "Connecting...";
     // @ts-ignore
-    socket = window.io('ws://pryxy.com:9800');
+    socket = window.io('http://pryxy.com');
     socket.on("connect_error", function (e) {
         console.log('connect_error', e);
     });
