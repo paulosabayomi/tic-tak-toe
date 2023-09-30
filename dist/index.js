@@ -310,7 +310,9 @@ sessionConnectBtn.onclick = function (e) {
     e.currentTarget.disabled = true;
     e.currentTarget.innerHTML = "Connecting...";
     // @ts-ignore
-    socket = window.io('ws://66.29.145.150');
+    socket = window.io('ws://66.29.145.150:9800', {
+        transports: ['websocket']
+    });
     socket.on("connect_error", function (e) {
         console.log('connect_error', e);
     });

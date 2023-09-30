@@ -288,7 +288,9 @@ sessionConnectBtn.onclick = (e) => {
     (e.currentTarget as HTMLButtonElement).disabled = true;
     (e.currentTarget as HTMLButtonElement).innerHTML = "Connecting..."
     // @ts-ignore
-    socket = window.io('ws://66.29.145.150');
+    socket = window.io('ws://66.29.145.150:9800', {
+        transports: ['websocket']
+     });
 
     socket.on("connect_error", (e: any) => {
         console.log('connect_error',e );
