@@ -303,18 +303,29 @@ roomIdInputEl.onchange = function (e) {
 settingsBtn.onclick = function () { return userInfoModal.show(); };
 sessionConnectBtn.onclick = function (e) {
     e.stopPropagation();
+    var btn = e.currentTarget;
     if (usernameInputEl.value == "")
         return;
     if (playerTypeSelect.value == "")
         return modalInfo.innerHTML = "Please select a Player type below";
-    e.currentTarget.disabled = true;
-    e.currentTarget.innerHTML = "Connecting...";
+    btn.disabled = true;
+    btn.innerHTML = "Connecting...";
     // @ts-ignore
-    socket = window.io('66.29.145.150:9800', {
-        transports: ['websocket']
+    socket = window.io('wss://api.pryxy.com:9800', {
+        transports: ['websocket'],
+        upgradeTimeout: 30000
     });
+    window.onbeforeunload = function () {
+        socket.close();
+    };
     socket.on("connect_error", function (e) {
         console.log('connect_error', e);
+        btn.disabled = false;
+        btn.innerHTML = "Connect";
+        modalInfo.innerHTML = "Could not connect to socket, please try again";
+        setTimeout(function () {
+            modalInfo.innerHTML = "";
+        }, 4000);
     });
     socket.on("connect", function () {
         console.log('connected');

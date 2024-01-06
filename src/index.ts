@@ -283,18 +283,29 @@ settingsBtn.onclick = () => userInfoModal.show()
 
 sessionConnectBtn.onclick = (e) => {
     e.stopPropagation()
+    const btn = e.currentTarget as HTMLButtonElement;
     if (usernameInputEl.value == "") return;
     if (playerTypeSelect.value == "") return modalInfo.innerHTML = "Please select a Player type below";
-    (e.currentTarget as HTMLButtonElement).disabled = true;
-    (e.currentTarget as HTMLButtonElement).innerHTML = "Connecting..."
+    btn.disabled = true;
+    btn.innerHTML = "Connecting..."
     // @ts-ignore
-    socket = window.io('66.29.145.150:9800', {
-        transports: ['websocket']
+    socket = window.io('wss://api.pryxy.com:9800', {
+        transports: ['websocket'],
+        upgradeTimeout: 30000
      });
+
+     window.onbeforeunload = () => {
+        socket.close()
+     }
 
     socket.on("connect_error", (e: any) => {
         console.log('connect_error',e );
-        
+        btn.disabled = false;
+        btn.innerHTML = "Connect"
+        modalInfo.innerHTML = "Could not connect to socket, please try again"
+        setTimeout(() => {
+            modalInfo.innerHTML = ""
+        }, 4000);
     })
     socket.on("connect", () => {
         console.log('connected');
